@@ -1,0 +1,31 @@
+{
+  "productName": "action",
+  "version": "1.0.0",
+  "identifier": "cn.timer.action",
+  "build": {
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1421",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build"
+  },
+  "app": {
+    "withGlobalTauri": false,
+    "windows": [],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "nsis",
+    "icon": [
+      "icons/icon.ico"
+    ],
+    "windows": {
+      "nsis": {
+        "languages": ["SimpChinese"],
+        "displayLanguageSelector": false
+      }
+    }
+  }
+}

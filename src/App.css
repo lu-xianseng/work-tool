@@ -1,0 +1,844 @@
+/* ── 全局 ── */
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0f172a;
+  color: #e5e7eb;
+}
+
+.container {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+/* ── 侧边栏布局 ── */
+/* container 由单列改为「左导航 + 右内容」两栏。
+   不用 align-items:stretch 之外的对齐方式：侧边栏需要与内容区等高，
+   否则内容较长时导航栏会浮在顶部、下方露出背景色断层。 */
+.app-shell {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.sidebar {
+  flex-shrink: 0;
+  width: 152px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* 宽度过渡会让收起/展开有连续感；只动 width，避免布局重排闪烁 */
+  transition: width 0.16s ease;
+}
+
+/* 收起态：窄到只容一个图标，横向空间全部让给内容区 */
+.sidebar-collapsed {
+  width: 44px;
+}
+
+.sidebar-brand {
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  padding: 0 8px 8px;
+  border-bottom: 1px solid #1e293b;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sidebar-collapsed .sidebar-brand {
+  /* 收起后只剩首字母，需要居中才不显得偏斜 */
+  padding: 0 0 8px;
+  text-align: center;
+  letter-spacing: 0;
+}
+
+.sidebar-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  text-align: left;
+  padding: 9px 10px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: #94a3b8;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sidebar-collapsed .nav-item {
+  /* 只有图标，必须水平居中，否则图标会贴着左边框 */
+  justify-content: center;
+  padding: 9px 0;
+}
+
+/* 图标不参与文字截断：省略号只作用于文案 span */
+.nav-icon {
+  flex-shrink: 0;
+}
+
+.nav-item span {
+  /* 长文案（如「定时重启和关机」）不换行撑破固定宽度 */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.nav-item:hover {
+  background: #1e293b;
+  color: #e5e7eb;
+}
+
+.nav-item-active {
+  background: rgba(59, 130, 246, 0.14);
+  color: #93c5fd;
+  font-weight: 500;
+}
+
+.nav-item-active:hover {
+  background: rgba(59, 130, 246, 0.2);
+  color: #bfdbfe;
+}
+
+/* 折叠按钮固定在侧边栏底部：margin-top:auto 把它推到 flex 列的末端 */
+.sidebar-toggle {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border: none;
+  border-top: 1px solid #1e293b;
+  border-radius: 0 0 8px 8px;
+  background: none;
+  color: #64748b;
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.sidebar-collapsed .sidebar-toggle {
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.sidebar-toggle:hover {
+  background: #1e293b;
+  color: #e5e7eb;
+}
+
+/* 内容区：flex 子项默认 min-width:auto，表格过宽时会把侧边栏挤掉，
+   置 0 才能让它按剩余空间收缩 */
+.page-main {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ── 关于页 ── */
+.about-placeholder {
+  margin: 0;
+  padding: 12px 4px;
+  color: #64748b;
+  font-size: 13px;
+  text-align: center;
+}
+
+/* ── 定时任务：倒计时 ── */
+.countdown-box {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  padding: 4px;
+}
+
+.countdown-label {
+  font-size: 13px;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+
+.countdown-text {
+  font-size: 20px;
+  font-weight: 600;
+  color: #f87171;
+  /* 数字逐秒变化时宽度会抖动，等宽数字让跳动不牵动整行布局 */
+  font-variant-numeric: tabular-nums;
+}
+
+.countdown-empty {
+  font-size: 15px;
+  color: #64748b;
+}
+
+/* ── 定时任务：表单 ── */
+.timer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.timer-form-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.timer-form-label {
+  flex-shrink: 0;
+  width: 40px;
+  font-size: 13px;
+  color: #cbd5e1;
+}
+
+/* config-input 自带 width:100%，表单里只给它一段固定宽度即可 */
+.timer-form-control {
+  width: auto;
+  flex: 0 1 200px;
+}
+
+.timer-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
+
+.timer-empty-cell {
+  color: #64748b;
+  text-align: center;
+  font-size: 13px;
+}
+
+/* ── 卡片 ── */
+.card {
+  background: #1e293b;
+  border-radius: 10px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+/* ── 表格 ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 12px;
+  text-align: left;
+  border-bottom: 1px solid #334155;
+}
+
+th {
+  color: #93c5fd;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+/* ── 状态 ── */
+.running {
+  color: #4ade80;
+  font-weight: bold;
+}
+
+.stopped {
+  color: #f87171;
+  font-weight: bold;
+}
+
+/* ── 分组进程数徽标 ── */
+.proc-count {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 7px;
+  font-size: 11px;
+  line-height: 16px;
+  color: #93c5fd;
+  background: rgba(96, 165, 250, 0.12);
+  border-radius: 9px;
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.proc-count:hover {
+  background: rgba(96, 165, 250, 0.26);
+  color: #dbeafe;
+}
+
+/* ── 进程详情浮层 ── */
+/* z-index 必须低于 .modal-mask(1000)：
+   悬停浮层是次要信息，弹窗打开时不应盖住弹窗；
+   同时要高于表格内容，故取 900 */
+.proc-popover {
+  position: fixed;
+  z-index: 900;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  /* 横向内边距下放到表格首末列：容器若有 padding，
+     吸顶表头两侧会留缝，滚动内容会从缝里透出来 */
+  padding: 0;
+  /* 高度由内联样式按视口可用空间给定；
+     用 flex 分栏，让标题固定、仅表格区域滚动 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.45);
+  font-size: 12px;
+}
+
+.proc-popover-title {
+  flex-shrink: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #e5e7eb;
+  padding: 10px 12px 8px;
+  border-bottom: 1px solid #334155;
+}
+
+/* 唯一滚动区域：标题保持可见，进程再多也只滚动这部分 */
+.proc-popover-scroll {
+  flex: 1;
+  min-height: 0; /* flex 子项默认为 auto，不置 0 则不会收缩，滚动会失效 */
+  overflow-y: auto;
+}
+
+.proc-popover-loading,
+.proc-popover-error {
+  padding: 12px;
+  color: #94a3b8;
+}
+
+.proc-popover-error {
+  color: #fca5a5;
+}
+
+/* ── 浮层内的进程表格 ──
+   必须覆盖全局 `th, td { padding: 10px 12px }`，
+   否则小尺寸浮层里每行会被撑得很高 */
+.proc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.proc-table th,
+.proc-table td {
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(51, 65, 85, 0.55);
+  font-size: 12px;
+  text-align: left;
+}
+
+/* 容器 padding 已归零，横向间距由首末列补回，
+   这样吸顶表头才能完整遮住滚动内容、不留透缝 */
+.proc-table th:first-child,
+.proc-table td:first-child {
+  padding-left: 12px;
+}
+
+.proc-table th:last-child,
+.proc-table td:last-child {
+  padding-right: 12px;
+}
+
+.proc-table th {
+  color: #93c5fd;
+  font-weight: 500;
+  font-size: 11px;
+  white-space: nowrap;
+  /* 进程较多需要滚动时，表头保持可见以便对照各列含义。
+     必须有不透明背景，否则下方行会透上来 */
+  position: sticky;
+  top: 0;
+  background: #1e293b;
+}
+
+.proc-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* 数值列右对齐 + 等宽数字，多行对比时位数才对得齐 */
+.proc-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #cbd5e1;
+}
+
+.proc-table .is-main td {
+  background: rgba(96, 165, 250, 0.07);
+}
+
+.proc-tree-mark {
+  color: #475569;
+}
+
+.proc-name {
+  font-weight: 600;
+  color: #e5e7eb;
+}
+
+/* ── PID 单元格 ── */
+.pid-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  color: #60a5fa;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-btn:hover {
+  color: #93c5fd;
+}
+
+/* ── 操作单元格 ── */
+/* td 自身必须保持默认 table-cell，否则高度不再随行拉伸，
+   border-bottom 会紧贴按钮而不是落在行底 */
+.action-cell {
+  white-space: nowrap;
+}
+
+.action-btns {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.stop-btn {
+  padding: 2px 10px;
+  font-size: 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #ef4444;
+  color: #fff;
+}
+
+.stop-btn:hover {
+  background: #dc2626;
+}
+
+.init-btn {
+  padding: 2px 10px;
+  font-size: 12px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #f59e0b;
+  color: #fff;
+}
+
+.init-btn:hover {
+  background: #d97706;
+}
+
+/* ── 状态文字 ── */
+.status {
+  margin-top: 12px;
+  color: #fca5a5;
+  font-size: 13px;
+}
+
+/* ── 顶部栏 ── */
+.settings-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.settings-header h2 {
+  margin: 0;
+  font-size: 20px;
+}
+
+.settings-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #94a3b8;
+  padding: 6px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+}
+
+.settings-btn:hover {
+  background: #1e293b;
+  color: #e5e7eb;
+}
+
+.back-btn {
+  display: flex;
+  align-items: center;
+  background: none;
+  border: none;
+  color: #60a5fa;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 14px;
+}
+
+.back-btn:hover {
+  background: rgba(96, 165, 250, 0.1);
+}
+
+/* 设置页右侧的行为提示：原「保存」按钮位置，改为说明返回即保存 */
+.settings-hint {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* ── 设置页 ── */
+.settings-page .card {
+  margin-top: 0;
+}
+
+.config-add-section {
+  margin-bottom: 16px;
+}
+
+.config-add-section h4 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #cbd5e1;
+}
+
+.config-input {
+  width: 100%;
+  padding: 8px 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  color: #e5e7eb;
+  font-size: 14px;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.config-input:focus {
+  border-color: #3b82f6;
+}
+
+.config-add-path-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  background: #3b82f6;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.config-add-path-btn:hover {
+  background: #2563eb;
+}
+
+.config-list {
+  margin-top: 12px;
+}
+
+.config-item {
+  background: #0f172a;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin-bottom: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.config-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+}
+
+.config-app-name {
+  font-weight: 600;
+}
+
+.config-delete-btn {
+  background: none;
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.config-delete-btn:hover {
+  background: #ef4444;
+  color: #fff;
+}
+
+/* ── 路径行 ── */
+.config-path-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  border-bottom: 1px solid #1e293b;
+  font-size: 13px;
+}
+
+.config-path-row:last-child {
+  border-bottom: none;
+}
+
+.path-remove-btn {
+  background: none;
+  border: none;
+  color: #94a3b8;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 0 4px;
+  line-height: 1;
+}
+
+.path-remove-btn:hover {
+  color: #ef4444;
+}
+
+/* ── 弹窗 ── */
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-box {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 280px;
+  max-width: 500px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+}
+
+/* 路径管理弹框：路径较长，需要更宽 */
+.path-modal-box {
+  width: min(760px, calc(100vw - 48px));
+  max-width: none;
+  box-sizing: border-box;
+}
+
+.path-add-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+/* config-input 自带 width:100%，flex 行内需要允许收缩 */
+.path-add-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 必须用固定 px，不能用 vh：
+   vh 随窗口高度变化，会与窗口高度自适应形成正反馈（窗口变高 → 弹框变高 → 窗口更高） */
+.path-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.modal-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 10px;
+}
+
+.modal-message {
+  font-size: 14px;
+  color: #cbd5e1;
+  white-space: pre-wrap;
+  word-break: break-word;
+  margin-bottom: 18px;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.modal-btn {
+  padding: 7px 16px;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  background: #3b82f6;
+  color: #fff;
+}
+
+.modal-btn:hover {
+  background: #2563eb;
+}
+
+.modal-btn-secondary {
+  background: #475569;
+}
+
+.modal-btn-secondary:hover {
+  background: #334155;
+}
+
+.modal-btn-confirm {
+  background: #3b82f6;
+}
+
+.modal-btn-confirm:hover {
+  background: #2563eb;
+}
+
+.modal-btn-error {
+  background: #ef4444;
+}
+
+.modal-btn-error:hover {
+  background: #dc2626;
+}
+
+/* ── Toast ── */
+.toast-list {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.toast {
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #e5e7eb;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-size: 13px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+  animation: toast-in 0.2s ease;
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.about-card {
+  padding: 24px;
+  line-height: 1.7;
+}
+
+.about-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+
+.about-subtitle {
+  font-size: 13px;
+  color: #fcfafa;
+  margin: 2px 0 0;
+}
+
+.about-desc {
+  font-size: 15px;
+  color: #f8f7f7;
+  margin: 0 0 18px;
+}
+
+.about-section {
+  margin-bottom: 16px;
+}
+
+.about-section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #f8f6f6;
+  margin: 0 0 8px;
+  padding-left: 8px;
+  border-left: 3px solid #4f7cff;
+}
+
+.about-list {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.about-list li {
+  font-size: 14px;
+  color: #fefbfb;
+  margin-bottom: 6px;
+}
+
+.about-list strong {
+  color: #fa4b06;
+  margin-right: 6px;
+}
+
+.about-text {
+  font-size: 14px;
+  color: #f7f7f7;
+  margin: 0;
+}
+
+.about-footer {
+  margin-top: 22px;
+  padding-top: 14px;
+  border-top: 1px solid #eee;
+  font-size: 12px;
+  color: #aaa;
+  text-align: left;
+}
+
+.about-footer a {
+  color: inherit; /* 继承父元素文字颜色，不再是蓝色 */
+  text-decoration: none; /* 去掉下划线 */
+}
+.about-footer a:hover {
+  text-decoration: underline; /* 鼠标悬浮再加下划线，可选 */
+}

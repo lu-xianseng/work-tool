@@ -1,0 +1,40 @@
+# ==================== 日志 ====================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ==================== 依赖与前端构建产物 ====================
+# 匹配任意层级：主项目与 action/ 子部件均生效
+node_modules
+dist
+dist-ssr
+*.local
+
+# ==================== Rust / Tauri 构建产物 ====================
+**/target
+**/src-tauri/gen
+
+# ==================== 运行时产物（本地生成，不提交） ====================
+# action.exe：子部件 action 的编译产物，work-tool 打包时作为资源内嵌，
+# 由开发者在打包前手动构建放置到 src-tauri/（见根 README「打包」一节）
+src-tauri/action.exe
+# apps.ini：运行时生成的进程监控配置，含本机私有数据
+src-tauri/apps.ini
+
+# ==================== 编辑器与系统文件 ====================
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+Thumbs.db
+desktop.ini
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.env.local

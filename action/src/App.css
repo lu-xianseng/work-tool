@@ -1,0 +1,132 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  font-family: "Segoe UI", "Microsoft YaHei", Arial, sans-serif;
+  background-color: #ffffff;
+  color: #2c3e50;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.confirm-window {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #ffffff;
+}
+
+/* 标题栏（自绘，可拖动） */
+.titlebar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 38px;
+  flex-shrink: 0;
+  padding-left: 16px;
+  background: linear-gradient(135deg, #2c3e50, #34495e);
+  color: #ffffff;
+}
+
+.titlebar .title {
+  font-size: 13px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tb-close {
+  width: 46px;
+  height: 100%;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s;
+}
+
+.tb-close:hover {
+  background-color: #e81123;
+  color: #ffffff;
+}
+
+/* 中部内容 */
+.content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 16px;
+  font-size: 17px;
+  font-weight: bold;
+  text-align: center;
+  line-height: 1.4;
+}
+
+.content .line {
+  color: #2c3e50;
+}
+
+.content .countdown {
+  font-size: 48px;
+  font-weight: bold;
+  color: #e74c3c;
+  margin: 4px 0;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 底部按钮 */
+.buttons {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  padding: 0 16px 16px;
+}
+
+.btn {
+  min-width: 120px;
+  padding: 9px 16px;
+  border: none;
+  border-radius: 5px;
+  font-size: 14px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: filter 0.15s;
+}
+
+.btn:hover {
+  filter: brightness(1.1);
+}
+
+.btn:active {
+  filter: brightness(0.95);
+}
+
+.btn-danger {
+  background-color: #eb4444;
+  color: #ffffff;
+}
+
+.btn-success {
+  background-color: #4caf50;
+  color: #ffffff;
+}
