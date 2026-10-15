@@ -18,10 +18,10 @@
   "bundle": {
     "active": true,
     "targets": "nsis",
-    "resources": [
-      "apps.ini",
-      "action.exe"
-    ],
+    "resources": {
+      "apps.ini": "config/apps.ini",
+      "action.exe": "lib/action.exe"
+    },
     "shortDescription": "进程管理工具",
     "longDescription": "这是一个测试工具应用，用于管理应用进程。",
     "icon": [

@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -8,10 +9,11 @@ import { useAutoWindowHeight, type OverlayTarget } from "./useAutoWindowHeight";
 import { ProcessPage, type ProcessPageHandle } from "./pages/ProcessPage";
 import { TimerPage, TimerAddPage } from "./pages/TimerPage";
 import { AboutPage } from "./pages/AboutPage";
+import { ChatPage } from "./pages/ChatPage";
 import "./App.css";
 
-/** 侧边栏的三个功能页 */
-type PageKey = "process" | "timer" | "about";
+/** 侧边栏的四个功能页 */
+type PageKey = "process" | "timer" | "chat" | "about";
 
 /**
  * 导航项。图标在侧边栏收起时是唯一可辨识的信息，因此必须始终提供，
@@ -32,6 +34,11 @@ const NAV_ITEMS: { key: PageKey; label: string; icon: ReactNode }[] = [
         <path d="M12 7v5l3 2" />
       </>
     ),
+  },
+  {
+    key: "chat",
+    label: "AI 对话",
+    icon: <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />,
   },
   {
     key: "about",
@@ -92,27 +99,36 @@ export function App() {
   // tooltip 是瞬时浮层，显示期间暂停高度自适应，避免窗口被撑高后位置漂移
   useAutoWindowHeight(containerRef, overlays, heightPaused);
 
-  const showToast = (message: string) => {
-    const id = toastId + 1;
-    setToastId(id);
-    setToasts((prev) => [...prev, { id, message }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2000);
-  };
+  // 以下处理器全部用 useCallback 保持稳定：
+  // 子页面（如 ChatPage）的加载 effect 依赖 onError 等 props，若每次渲染都换新引用，
+  // App 一重渲染（如 toast 出现）就会让子页重新加载/重置状态。
+  const showToast = useCallback(
+    (message: string) => {
+      const id = toastId + 1;
+      setToastId(id);
+      setToasts((prev) => [...prev, { id, message }]);
+      setTimeout(() => {
+        setToasts((prev) => prev.filter((t) => t.id !== id));
+      }, 2000);
+    },
+    [toastId]
+  );
 
   // 供各页面复用的弹窗能力：App 统一持有 modal 状态，页面只需按需调用
-  const showConfirm = (title: string, message: string, onOk: () => void) => {
-    setModal({ kind: "confirm", title, message, onConfirm: onOk });
-  };
+  const showConfirm = useCallback(
+    (title: string, message: string, onOk: () => void) => {
+      setModal({ kind: "confirm", title, message, onConfirm: onOk });
+    },
+    []
+  );
 
-  const showError = (title: string, message: string) => {
+  const showError = useCallback((title: string, message: string) => {
     setModal({ kind: "error", title, message });
-  };
+  }, []);
 
-  const closeModal = () => {
+  const closeModal = useCallback(() => {
     setModal(null);
-  };
+  }, []);
 
   /**
    * 侧边栏切换功能页。
@@ -141,7 +157,12 @@ export function App() {
   }, []);
 
   return (
-    <div className="container app-shell" ref={containerRef}>
+    <div
+      className={
+        page === "chat" ? "container app-shell container-wide" : "container app-shell"
+      }
+      ref={containerRef}
+    >
       <div className="toast-list">
         {toasts.map((t) => (
           <div key={t.id} className="toast">
@@ -239,6 +260,13 @@ export function App() {
                 onError={showError}
                 onConfirm={showConfirm}
                 onOpenAdd={() => setShowTimerAdd(true)}
+              />
+            )}
+            {page === "chat" && (
+              <ChatPage
+                onToast={showToast}
+                onError={showError}
+                onConfirm={showConfirm}
               />
             )}
             {page === "about" && <AboutPage />}

@@ -272,11 +272,11 @@ fn make_task_name(action: &str, hour: i32, minute: i32, loop_type: &str, day: &s
     )
 }
 
-/// 执行程序的定位方式与 apps.ini 一致：exe 同级目录，便于随安装包分发
+/// 执行程序随安装包分发到安装目录 lib/ 下（安装目录 = exe 所在目录）
 fn action_program_path() -> PathBuf {
     std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|dir| dir.join(ACTION_PROGRAM_NAME)))
+        .and_then(|p| p.parent().map(|dir| dir.join("lib").join(ACTION_PROGRAM_NAME)))
         .unwrap_or_else(|| PathBuf::from(ACTION_PROGRAM_NAME))
 }
 
@@ -327,10 +327,13 @@ pub struct NextTask {
     pub action: String,
 }
 
+/// 定时任务数据库存放在安装目录 data/ 下（安装目录 = exe 所在目录）
 fn db_path() -> PathBuf {
-    let mut path = dirs::config_dir().unwrap_or_else(|| PathBuf::from("."));
-    path.push("WorkTool");
-    path.push("db");
+    let mut path = std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|dir| dir.to_path_buf()))
+        .unwrap_or_else(|| PathBuf::from("."));
+    path.push("data");
     let _ = fs::create_dir_all(&path);
     path.join("data.db")
 }

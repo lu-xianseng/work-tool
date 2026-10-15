@@ -12,6 +12,12 @@ body {
   padding: 16px;
 }
 
+/* 对话页放宽容器的最大宽度，让消息/代码块随窗口宽度自适应，
+   避免宽内容被压缩后只能靠底部横向滚动条查看 */
+.container-wide {
+  max-width: none;
+}
+
 /* ── 侧边栏布局 ── */
 /* container 由单列改为「左导航 + 右内容」两栏。
    不用 align-items:stretch 之外的对齐方式：侧边栏需要与内容区等高，
@@ -841,4 +847,455 @@ th {
 }
 .about-footer a:hover {
   text-decoration: underline; /* 鼠标悬浮再加下划线，可选 */
+}
+
+/* ==================== AI 对话页 ==================== */
+.chat-layout {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+/* 左侧：对话列表 */
+.chat-sidebar {
+  flex-shrink: 0;
+  width: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-new-btn {
+  border: 1px dashed #475569;
+  background: none;
+  color: #94a3b8;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.chat-new-btn:hover {
+  border-color: #4a9eff;
+  color: #4a9eff;
+  background: rgba(74, 158, 255, 0.06);
+}
+
+.chat-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  max-height: 460px;
+}
+
+.chat-item {
+  position: relative;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background 0.15s ease;
+}
+
+.chat-item:hover {
+  background: #1e293b;
+}
+
+.chat-item-active {
+  background: #1e293b;
+  border-color: #334155;
+}
+
+.chat-item-title {
+  font-size: 13px;
+  color: #e5e7eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 20px;
+}
+
+.chat-item-meta {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+.chat-item-del {
+  position: absolute;
+  top: 8px;
+  right: 6px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: #64748b;
+  font-size: 14px;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.chat-item:hover .chat-item-del,
+.chat-item-active .chat-item-del {
+  opacity: 1;
+}
+
+.chat-item-del:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.12);
+}
+
+/* 右侧：消息区 + 输入框 */
+.chat-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chat-messages {
+  flex: 1;
+  min-height: 0;
+  max-height: 460px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 4px 2px;
+}
+
+.chat-welcome {
+  margin: auto;
+  text-align: center;
+  color: #64748b;
+}
+
+.chat-welcome h3 {
+  font-size: 16px;
+  color: #94a3b8;
+  margin: 0 0 6px;
+}
+
+.chat-welcome p {
+  font-size: 13px;
+  margin: 0;
+}
+
+.chat-msg {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 88%;
+}
+
+.chat-msg-user {
+  align-self: flex-end;
+  align-items: flex-end;
+}
+
+.chat-msg-assistant {
+  align-self: flex-start;
+  align-items: flex-start;
+}
+
+.chat-msg-role {
+  font-size: 11px;
+  color: #64748b;
+  padding: 0 2px;
+}
+
+.chat-msg-body {
+  font-size: 14px;
+  line-height: 1.65;
+  color: #e5e7eb;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px 12px;
+  word-break: break-word;
+}
+
+.chat-msg-user .chat-msg-body {
+  background: rgba(74, 158, 255, 0.12);
+  border-color: rgba(74, 158, 255, 0.35);
+}
+
+.chat-msg-img {
+  display: block;
+  max-width: 320px;
+  max-height: 240px;
+  border-radius: 8px;
+  margin: 4px 0;
+}
+
+.chat-thinking {
+  align-self: flex-start;
+  font-size: 13px;
+  color: #64748b;
+  padding: 6px 4px;
+}
+
+/* 输入区 */
+.chat-input-area {
+  border: 1px solid #334155;
+  border-radius: 10px;
+  background: #1e293b;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.chat-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chat-preview-item {
+  position: relative;
+}
+
+.chat-preview-item img {
+  width: 72px;
+  height: 72px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid #334155;
+}
+
+.chat-preview-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  line-height: 1;
+  border: none;
+  border-radius: 50%;
+  background: #ef4444;
+  color: #fff;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* 文本类附件预览：文件名 + 大小 + 移除 */
+.chat-preview-file {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 240px;
+  padding: 6px 10px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #16213a;
+  font-size: 12px;
+}
+
+.chat-preview-file-name {
+  color: #e5e7eb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.chat-preview-file-size {
+  color: #64748b;
+  flex: none;
+}
+
+/* 附件上传按钮（回形针） */
+.chat-attach-btn {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  background: #1e293b;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.chat-attach-btn:hover {
+  color: #4a9eff;
+  border-color: #4a9eff;
+}
+
+.chat-input {
+  width: 100%;
+  box-sizing: border-box;
+  resize: none;
+  border: none;
+  outline: none;
+  background: none;
+  color: #e5e7eb;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.chat-input::placeholder {
+  color: #64748b;
+}
+
+.chat-input-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+/* 代码块（一键复制） */
+.code-block {
+  margin: 6px 0;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #0f172a;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: #1e293b;
+  border-bottom: 1px solid #334155;
+}
+
+.code-block-lang {
+  font-size: 11px;
+  color: #94a3b8;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+}
+
+.code-copy-btn {
+  border: none;
+  background: none;
+  color: #94a3b8;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.code-copy-btn:hover {
+  color: #e5e7eb;
+  background: #334155;
+}
+
+.code-block-pre {
+  margin: 0;
+  padding: 10px 12px;
+  overflow-x: auto;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #e2e8f0;
+  white-space: pre;
+}
+
+/* ==================== AI 对话：多模型 / 流式 / 标题 ==================== */
+
+.chat-model-select {
+  width: 180px;
+  flex: none;
+  padding: 5px 8px;
+  font-size: 13px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+  border-radius: 6px;
+  outline: none;
+}
+
+.chat-model-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.chat-stream-error {
+  margin: 12px;
+  padding: 10px 12px;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  background: rgba(248, 113, 113, 0.08);
+  border-radius: 8px;
+  color: #f87171;
+  font-size: 13px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.chat-settings-tip {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.6;
+}
+
+/* 模型列表行：点击整行进入编辑弹框 */
+.chat-model-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding: 9px 12px;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  background: #16213a;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.chat-model-row:hover {
+  border-color: #4a9eff;
+}
+
+.chat-model-row-name {
+  font-size: 14px;
+  color: #e2e8f0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-model-del-btn {
+  flex: none;
+  font-size: 12px;
+  color: #f87171;
+  background: none;
+  border: 1px solid rgba(248, 113, 113, 0.4);
+  border-radius: 4px;
+  padding: 2px 8px;
+  cursor: pointer;
+}
+
+.chat-model-del-btn:hover {
+  background: rgba(248, 113, 113, 0.12);
+}
+
+/* 模型编辑弹框：固定宽度，避免页面随表单内容长高 */
+.chat-model-modal {
+  width: 460px;
+  max-width: calc(100vw - 48px);
+  box-sizing: border-box;
+}
+
+.chat-model-modal .timer-form-row {
+  margin-bottom: 10px;
 }

@@ -92,10 +92,11 @@ impl ProcessGroup {
     }
 }
 
+/// 配置文件随安装包分发到安装目录 config/ 下（安装目录 = exe 所在目录）
 fn apps_ini_path() -> PathBuf {
     std::env::current_exe()
         .ok()
-        .and_then(|p| p.parent().map(|p| p.join("apps.ini")))
+        .and_then(|p| p.parent().map(|dir| dir.join("config").join("apps.ini")))
         .unwrap_or_else(|| PathBuf::from("apps.ini"))
 }
 

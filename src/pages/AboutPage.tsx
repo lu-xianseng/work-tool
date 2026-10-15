@@ -13,7 +13,7 @@ export function AboutPage() {
 
         {/* 核心功能 */}
         <section className="about-section">
-          <h3 className="about-section-title">核心功能</h3>
+          <h3 className="about-section-title">功能说明</h3>
           <ul className="about-list">
             <li>
               <strong>进程管理</strong>
@@ -32,6 +32,22 @@ export function AboutPage() {
               <span>支持每天、每周、每月三种周期，配置执行时刻与目标动作</span>
               <br />
               <span>实时倒计时并在触发前弹出二次确认窗口，防止误操作。</span>
+            </li>
+            <li>
+              <strong>AI 对话</strong>
+              <br />
+              <span>
+                - 对接 NEW-API 服务，支持配置多个模型，对话内随时切换，每条对话记忆自己使用的模型。
+              </span>
+              <br />
+              <span>
+                - 对话支持新建 / 切换 / 删除。
+              </span>
+              <br />
+              <span>
+                - 支持直接粘贴图片，或上传文本类附件（含 KiCad / Eagle 等 EDA 文本格式，如 .kicad_pcb、.sch、.brd、.net）。
+              </span>
+              <br />
             </li>
           </ul>
         </section>
