@@ -21,7 +21,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use tauri::{ipc::Channel, State};
+use tauri::{ipc::Channel, Manager, State};
 
 /// 消息 id 序号：同毫秒内生成多条消息时自增，保证全局唯一
 static MSG_SEQ: AtomicU64 = AtomicU64::new(0);
@@ -510,13 +510,31 @@ pub fn add_message(
 // ==================== 命令：AI 流式对话 ====================
 
 /// 读取指定对话的全部消息，以流式（SSE）方式调用 NEW-API（OpenAI 兼容
-/// /v1/chat/completions），增量文本通过 Channel 下发；结束后发送 Done 事件
-/// 携带完整回复（由前端 add_message 保存）。
+/// /v1/chat/completions），增量文本通过 Channel 下发。
+///
+/// 命令体为 async：真正的阻塞 IO（HTTP 流式读取）挪到 tokio 线程池执行。
+/// 若直接写成同步命令，Tauri v2 会在主线程上跑完整段流式读取，
+/// 期间窗口事件循环被锁死 → 点击无响应（但 WebView 渲染不受影响，
+/// 表现就是「AI 还在输出、界面点不动」）。
 #[tauri::command]
-pub fn stream_chat(
+pub async fn stream_chat(
     conversation_id: String,
     channel: Channel<ChatStreamEvent>,
-    state: State<'_, ChatStore>,
+    app: tauri::AppHandle,
+) -> Result<(), String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<ChatStore>();
+        stream_chat_impl(conversation_id, channel, &state)
+    })
+    .await
+    .map_err(|e| format!("流式任务执行失败: {e}"))?
+}
+
+/// stream_chat 的同步实现（由 async 命令在阻塞线程池中调用）。
+fn stream_chat_impl(
+    conversation_id: String,
+    channel: Channel<ChatStreamEvent>,
+    state: &ChatStore,
 ) -> Result<(), String> {
     let models = state.load_settings()?;
     let data = state.load_chat_data()?;
@@ -556,7 +574,7 @@ pub fn stream_chat(
         return Err(format!("AI 服务返回错误（HTTP {status}）: {message}"));
     }
 
-    // SSE 逐行解析：data: {...}，以 data: [DONE] 结束
+    // SSE 逐行解析：data: {...}，以 data: [DONE] 结束。
     let mut full_text = String::new();
     let mut reader = BufReader::new(resp);
     let mut line = String::new();
@@ -615,9 +633,22 @@ pub fn stream_chat(
 ///
 /// 生成失败（未配置模型 / AI 报错等）时返回 Err，前端可回退为本地截取。
 #[tauri::command]
-pub fn generate_conversation_title(
+pub async fn generate_conversation_title(
     conversation_id: String,
-    state: State<'_, ChatStore>,
+    app: tauri::AppHandle,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<ChatStore>();
+        generate_conversation_title_impl(conversation_id, &state)
+    })
+    .await
+    .map_err(|e| format!("标题生成任务执行失败: {e}"))?
+}
+
+/// generate_conversation_title 的同步实现（由 async 命令在阻塞线程池中调用）。
+fn generate_conversation_title_impl(
+    conversation_id: String,
+    state: &ChatStore,
 ) -> Result<String, String> {
     let models = state.load_settings()?;
     let data = state.load_chat_data()?;
@@ -826,6 +857,7 @@ mod tests {
         let payload = build_payload(&model, &messages, true).unwrap();
         assert_eq!(payload["model"], "gpt-4o-mini");
         assert_eq!(payload["stream"], true);
+        assert!(payload.get("tools").is_none());
         let msgs = payload["messages"].as_array().unwrap();
         // 含图 user 消息：content 为数组
         let content = &msgs[0]["content"];

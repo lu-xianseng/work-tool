@@ -45,7 +45,7 @@ export function AboutPage() {
               </span>
               <br />
               <span>
-                - 支持直接粘贴图片，或上传文本类附件（含 KiCad / Eagle 等 EDA 文本格式，如 .kicad_pcb、.sch、.brd、.net）。
+                - 支持直接粘贴图片，或上传文本类附件（.txt / .md / .json / .csv / .log 等），AI 可直接读取并理解内容。
               </span>
               <br />
             </li>

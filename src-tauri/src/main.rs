@@ -10,10 +10,13 @@ use std::sync::Arc;
 use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// 主窗口初始尺寸。
-/// 高度只是起点：前端 useAutoWindowHeight 会在首帧测内容高度后自行调整。
-/// 宽度已计入左侧 152px 导航栏与 16px 间距，保证内容区不比加侧边栏前更窄。
-const MAIN_WIDTH: f64 = 960.0;
-const MAIN_HEIGHT: f64 = 350.0;
+/// 高度只是起点：非对话页前端 useAutoWindowHeight 会在首帧测内容高度后自行调整；
+/// AI 对话页激活时高度自适应暂停，因此初始高度就是对话页的实际体验高度，
+/// 取 680 兼顾 1080p 与 1366×768（含标题栏后不超出 768 屏可用区）。
+/// 宽度已计入左侧 152px 导航栏与 16px 间距；1200 下对话消息区约 790px，
+/// 代码块/长文本无需横向滚动即可完整阅读。
+const MAIN_WIDTH: f64 = 1200.0;
+const MAIN_HEIGHT: f64 = 680.0;
 
 /// 安装目录 = 可执行文件所在目录（NSIS 安装包把 exe 装在安装目录根）。
 fn install_dir() -> PathBuf {

@@ -6,10 +6,14 @@ body {
   color: #e5e7eb;
 }
 
+/* 桌面工具类应用：容器宽度随窗口自适应拉伸（不设 max-width 居中）。
+   对话页的 container-wide 与之等价，保留仅为兼容。 */
 .container {
-  max-width: 900px;
+  max-width: none;
   margin: 0 auto;
   padding: 16px;
+  /* chat 页激活时 height:100vh 需含 padding，否则容器总高=100vh+32px，底部超出窗口 */
+  box-sizing: border-box;
 }
 
 /* 对话页放宽容器的最大宽度，让消息/代码块随窗口宽度自适应，
@@ -143,10 +147,14 @@ body {
 }
 
 /* 内容区：flex 子项默认 min-width:auto，表格过宽时会把侧边栏挤掉，
-   置 0 才能让它按剩余空间收缩 */
+   置 0 才能让它按剩余空间收缩。
+   同时自身为纵向 flex 容器：AI 对话页（chat-keepalive）可撑满窗口高度，
+   输入框贴底；其余页面内容高不变（块级子项按内容高度）。 */
 .page-main {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── 关于页 ── */
@@ -850,7 +858,17 @@ th {
 }
 
 /* ==================== AI 对话页 ==================== */
+/* chat 页 keep-alive 包裹层：激活时撑满 page-main，输入框贴窗口底部 */
+.chat-keepalive {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .chat-layout {
+  flex: 1;
+  min-height: 0;
   display: flex;
   gap: 12px;
   align-items: stretch;
@@ -863,6 +881,7 @@ th {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-height: 0;
 }
 
 .chat-new-btn {
@@ -883,11 +902,12 @@ th {
 }
 
 .chat-list {
+  flex: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
   overflow-y: auto;
-  max-height: 460px;
 }
 
 .chat-item {
@@ -954,6 +974,7 @@ th {
 .chat-main {
   flex: 1;
   min-width: 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -962,7 +983,6 @@ th {
 .chat-messages {
   flex: 1;
   min-height: 0;
-  max-height: 460px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;

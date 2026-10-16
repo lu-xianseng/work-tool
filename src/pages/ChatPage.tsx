@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { Channel } from "@tauri-apps/api/core";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import {
@@ -146,6 +154,46 @@ function renderContent(content: string): ReactNode[] {
   }
   if (nodes.length === 0) return [<span key="empty">{renderInlineText(content)}</span>];
   return nodes;
+}
+
+/**
+ * 历史消息列表（memo 隔离）。
+ * 流式输出期间 streamingText 每帧变化，只允许流式消息组件重渲染；
+ * messages 引用不变时整个历史列表跳过渲染，避免每帧全量解析 markdown 拖慢主线程。
+ */
+const MessageList = memo(function MessageList({ messages }: { messages: ChatMessage[] }) {
+  return (
+    <>
+      {messages.map((msg) => (
+        <div
+          key={msg.id}
+          className={
+            msg.role === "user" ? "chat-msg chat-msg-user" : "chat-msg chat-msg-assistant"
+          }
+        >
+          <div className="chat-msg-role">{msg.role === "user" ? "我" : "AI"}</div>
+          <div className="chat-msg-body">{renderContent(msg.content)}</div>
+        </div>
+      ))}
+    </>
+  );
+});
+
+/** 流式输出中的 AI 消息：独立组件，增量变化只重渲染它自己（轻量纯文本，不做代码块/图片解析） */
+function StreamingMessage({ text }: { text: string | null }) {
+  if (text === null) return null;
+  return (
+    <div className="chat-msg chat-msg-assistant">
+      <div className="chat-msg-role">AI</div>
+      <div className="chat-msg-body">
+        {text ? (
+          <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{text}</span>
+        ) : (
+          <span className="chat-thinking">正在思考…</span>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ==================== 设置子页（多模型配置） ====================
@@ -305,9 +353,9 @@ function ChatSettingsPage({ onToast, onError, onBack }: ChatSettingsPageProps) {
 
       <div className="card">
         <div className="config-add-section">
-          <h4>模型列表（对话时可选）</h4>
+          <h4>模型列表</h4>
           <p className="chat-settings-tip">
-            支持配置多个模型；对话界面可下拉切换，每个对话记忆自己使用的模型。
+            对话界面可下拉切换，每个对话记忆自己使用的模型。
             点击列表项可修改模型信息。
           </p>
 
@@ -396,10 +444,14 @@ export function ChatPage({ onToast, onError, onConfirm }: ChatPageProps) {
   const [sending, setSending] = useState(false);
   /** 流式回复文本：null = 未在流式；空串 = 已开始、尚未收到增量 */
   const [streamingText, setStreamingText] = useState<string | null>(null);
+  /** 正在流式输出的对话 id：流式状态只属于发起它的对话。
+   *  新建/切换对话时不显示旧对话的流式残留；切回旧对话则继续显示增量。 */
+  const [streamingConvId, setStreamingConvId] = useState<string | null>(null);
   const [streamError, setStreamError] = useState<string | null>(null);
 
   const messagesRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   /** 流式文本累积缓冲 + rAF 节流：合并高频 delta，避免每个 IPC 都触发全量渲染（长回复时拖垮主线程） */
   const streamBufRef = useRef("");
   const rafRef = useRef<number | null>(null);
@@ -656,6 +708,18 @@ export function ChatPage({ onToast, onError, onConfirm }: ChatPageProps) {
     for (const f of files) addAttachment(f);
   };
 
+  /** 输入变化：仅更新文本 */
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInput(e.target.value);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      void handleSend();
+    }
+  };
+
   const handleSend = async () => {
     const text = input.trim();
     if ((!text && pendingAttachments.length === 0) || !activeId || sending) return;
@@ -664,8 +728,15 @@ export function ChatPage({ onToast, onError, onConfirm }: ChatPageProps) {
       return;
     }
 
-    // 图片以 markdown 内嵌（后端解析转 image_url）；文本附件以「附件 + 代码块」嵌入正文
-    const content = [
+    const convId = activeId;
+    // 首轮判定：发送前对话为空，且标题还是默认的「新对话」
+    const isFirstRound =
+      activeConv !== null &&
+      activeConv.messages.length === 0 &&
+      (!activeConv.title || activeConv.title === "新对话");
+
+    // 本轮用户消息内容：普通文本 + 附件
+    const roundContent = [
       text,
       ...pendingAttachments.map((a) => {
         if (a.kind === "image") return `![图片](${a.dataUrl})`;
@@ -676,70 +747,75 @@ export function ChatPage({ onToast, onError, onConfirm }: ChatPageProps) {
       .filter(Boolean)
       .join("\n");
 
-    const convId = activeId;
-    // 首轮判定：发送前对话为空，且标题还是默认的「新对话」
-    const isFirstRound =
-      activeConv !== null &&
-      activeConv.messages.length === 0 &&
-      (!activeConv.title || activeConv.title === "新对话");
-
     setInput("");
     setPendingAttachments([]);
     setStreamingText("");
     setStreamError(null);
+    setStreamingConvId(convId);
     setSending(true);
-    streamBufRef.current = "";
 
     try {
-      // 1. 保存用户消息
-      const userMsg = await chatApi.addMessage(convId, "user", content);
+      streamBufRef.current = "";
+      setStreamingText("");
+
+      // 1. 保存 user 消息
+      const userMsg = await chatApi.addMessage(convId, "user", roundContent);
       appendMessage(convId, userMsg);
 
-      // 2. 流式调用 AI：增量经 rAF 节流后实时渲染，Done 后保存 assistant 消息
-      const channel = new Channel<ChatStreamEvent>();
-      channel.onmessage = (evt) => {
-        if (evt.type === "delta") {
-          streamBufRef.current += evt.text;
-          if (rafRef.current == null) {
-            rafRef.current = requestAnimationFrame(() => {
-              rafRef.current = null;
-              setStreamingText(streamBufRef.current);
-            });
-          }
-        } else if (evt.type === "error") {
-          if (rafRef.current != null) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-          }
-          setStreamingText(null);
-          setStreamError(evt.message);
-        } else if (evt.type === "done") {
-          if (rafRef.current != null) {
-            cancelAnimationFrame(rafRef.current);
-            rafRef.current = null;
-          }
-          setStreamingText(null);
-          const full = evt.fullText ?? "";
-          void (async () => {
-            try {
-              // 3. 保存 assistant 消息
-              const aiMsg = await chatApi.addMessage(convId, "assistant", full);
-              appendMessage(convId, aiMsg);
-              // 4. 首轮问答完成后自动生成标题
-              if (isFirstRound) void generateTitleFor(convId, content);
-            } catch (e) {
-              onError("出错了", `保存 AI 回复失败: ${e}`);
-            }
-          })();
-        }
-      };
+      // 首轮消息落库后立即生成标题（AI 生成，失败本地截取）：
+      // 与 AI 回复成败解耦——即使模型配置失效/请求失败，标题也不会停留在「新对话」
+      if (isFirstRound) void generateTitleFor(convId, text);
 
-      await chatApi.streamChat(convId, channel);
+      // 2. 流式调用 AI
+      const channel = new Channel<ChatStreamEvent>();
+      const outcome = await new Promise<{ text: string; errored: boolean }>((resolve) => {
+        let full = "";
+        channel.onmessage = (evt) => {
+          if (evt.type === "delta") {
+            streamBufRef.current += evt.text;
+            if (rafRef.current == null) {
+              rafRef.current = requestAnimationFrame(() => {
+                rafRef.current = null;
+                setStreamingText(streamBufRef.current);
+              });
+            }
+          } else if (evt.type === "error") {
+            if (rafRef.current != null) {
+              cancelAnimationFrame(rafRef.current);
+              rafRef.current = null;
+            }
+            setStreamingText(null);
+            setStreamError(evt.message);
+            resolve({ text: full, errored: true });
+          } else if (evt.type === "done") {
+            if (rafRef.current != null) {
+              cancelAnimationFrame(rafRef.current);
+              rafRef.current = null;
+            }
+            setStreamingText(null);
+            resolve({ text: evt.fullText ?? "", errored: false });
+          }
+        };
+        chatApi.streamChat(convId, channel).catch((e) => {
+          setStreamError(String(e));
+          resolve({ text: "", errored: true });
+        });
+      });
+
+      if (outcome.errored) return;
+
+      // 3. 保存 assistant 消息（空回复不落库）
+      if (outcome.text.trim()) {
+        const aiMsg = await chatApi.addMessage(convId, "assistant", outcome.text);
+        appendMessage(convId, aiMsg);
+      }
     } catch (e) {
       setStreamingText(null);
       onError("出错了", String(e));
     } finally {
       setSending(false);
+      setStreamingText(null);
+      setStreamingConvId(null);
     }
   };
 
@@ -823,38 +899,15 @@ export function ChatPage({ onToast, onError, onConfirm }: ChatPageProps) {
               </div>
             ) : (
               <>
-                {activeConv.messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={
-                      msg.role === "user" ? "chat-msg chat-msg-user" : "chat-msg chat-msg-assistant"
-                    }
-                  >
-                    <div className="chat-msg-role">
-                      {msg.role === "user" ? "我" : "AI"}
-                    </div>
-                    <div className="chat-msg-body">{renderContent(msg.content)}</div>
-                  </div>
-                ))}
-                {/* 流式输出中的 AI 消息：轻量纯文本渲染（不做代码块/图片正则解析），
-                    done 后由正式消息走完整 renderContent，避免每帧全量解析拖慢主线程 */}
-                {streamingText !== null && (
-                  <div className="chat-msg chat-msg-assistant">
-                    <div className="chat-msg-role">AI</div>
-                    <div className="chat-msg-body">
-                      {streamingText ? (
-                        <span style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                          {streamingText}
-                        </span>
-                      ) : (
-                        <span className="chat-thinking">正在思考…</span>
-                      )}
-                    </div>
-                  </div>
+                <MessageList messages={activeConv.messages} />
+                {/* 流式输出中的 AI 消息：只属于发起流式的对话。
+                    新建/切换对话后不显示旧对话的流式残留；切回原对话则继续显示增量 */}
+                {streamingConvId === activeId && (
+                  <StreamingMessage text={streamingText} />
                 )}
               </>
             )}
-            {streamError && (
+            {streamingConvId === activeId && streamError && (
               <div className="chat-stream-error">
                 AI 回复出错了：{streamError}
               </div>
@@ -905,18 +958,14 @@ export function ChatPage({ onToast, onError, onConfirm }: ChatPageProps) {
               </div>
             )}
             <textarea
+              ref={inputRef}
               className="chat-input"
               placeholder="输入消息，可直接粘贴图片…（Enter 发送，Shift+Enter 换行）"
               rows={3}
               value={input}
-              onChange={(e) => setInput(e.target.value)}
+              onChange={handleInputChange}
               onPaste={handlePaste}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  void handleSend();
-                }
-              }}
+              onKeyDown={handleInputKeyDown}
             />
             <div className="chat-input-actions">
               <button

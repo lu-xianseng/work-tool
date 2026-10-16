@@ -6,6 +6,8 @@ import {
   type ReactNode,
 } from "react";
 import { useAutoWindowHeight, type OverlayTarget } from "./useAutoWindowHeight";
+import { getCurrentWindow } from "@tauri-apps/api/window";
+import { LogicalSize } from "@tauri-apps/api/dpi";
 import { ProcessPage, type ProcessPageHandle } from "./pages/ProcessPage";
 import { TimerPage, TimerAddPage } from "./pages/TimerPage";
 import { AboutPage } from "./pages/AboutPage";
@@ -14,6 +16,9 @@ import "./App.css";
 
 /** 侧边栏的四个功能页 */
 type PageKey = "process" | "timer" | "chat" | "about";
+
+/** AI 对话页最低内容高度（逻辑像素），低于该值时切到对话页自动放大一次 */
+const CHAT_MIN_HEIGHT = 640;
 
 /**
  * 导航项。图标在侧边栏收起时是唯一可辨识的信息，因此必须始终提供，
@@ -59,6 +64,7 @@ interface ModalState {
   title: string;
   message: string;
   onConfirm?: () => void;
+  onCancel?: () => void;
 }
 
 interface ToastItem {
@@ -88,6 +94,9 @@ export function App() {
   const containerRef = useRef<HTMLDivElement>(null);
   const modalBoxRef = useRef<HTMLDivElement>(null);
   const pathModalBoxRef = useRef<HTMLDivElement>(null);
+  /** 弹窗按钮引用：用于键盘焦点循环（Tab 在 确定/取消 间切换） */
+  const modalOkRef = useRef<HTMLButtonElement>(null);
+  const modalCancelRef = useRef<HTMLButtonElement>(null);
   /** 进程页的保存句柄：设置页打开时，切走前必须先落盘，失败则留在原处 */
   const processRef = useRef<ProcessPageHandle>(null);
 
@@ -97,7 +106,44 @@ export function App() {
   ];
   // 窗口高度跟随内容自适应（含两个 fixed 弹窗，它们不参与文档流需单独测量）
   // tooltip 是瞬时浮层，显示期间暂停高度自适应，避免窗口被撑高后位置漂移
-  useAutoWindowHeight(containerRef, overlays, heightPaused);
+  // AI 对话页激活时也暂停：chat 布局撑满窗口、输入框贴底，
+  // 窗口高度由用户手动拉伸控制，不与内容自适应打架
+  useAutoWindowHeight(containerRef, overlays, page === "chat" || heightPaused);
+
+  // AI 对话页最低内容高度：默认启动页是进程管理，首帧自适应会把窗口缩回
+  // 内容高度（约 350），而对话页激活时高度自适应暂停（布局撑满窗口、输入框
+  // 贴底），若不补一次，对话页就一直是压缩后的小窗口。
+  // 仅在「切换进入对话页」且当前高度低于该值时放大一次；之后用户手动拉伸
+  // 窗口高度完全由用户控制；最大化 / 全屏时跳过，不与用户意图打架。
+  useEffect(() => {
+    if (page !== "chat") return;
+    if (!("__TAURI_INTERNALS__" in window)) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const win = getCurrentWindow();
+        if ((await win.isMaximized()) || (await win.isFullscreen())) return;
+        const [outer, inner, scaleFactor] = await Promise.all([
+          win.outerSize(),
+          win.innerSize(),
+          win.scaleFactor(),
+        ]);
+        const chrome = (outer.height - inner.height) / scaleFactor;
+        const contentH = inner.height / scaleFactor - chrome;
+        if (contentH < CHAT_MIN_HEIGHT) {
+          if (cancelled) return;
+          await win.setSize(
+            new LogicalSize(inner.width / scaleFactor, CHAT_MIN_HEIGHT + chrome)
+          );
+        }
+      } catch (e) {
+        console.warn("对话页高度对齐失败:", e);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [page]);
 
   // 以下处理器全部用 useCallback 保持稳定：
   // 子页面（如 ChatPage）的加载 effect 依赖 onError 等 props，若每次渲染都换新引用，
@@ -115,9 +161,10 @@ export function App() {
   );
 
   // 供各页面复用的弹窗能力：App 统一持有 modal 状态，页面只需按需调用
+  // onCancel 可选：技能脚本执行等场景需要在用户取消时恢复流程
   const showConfirm = useCallback(
-    (title: string, message: string, onOk: () => void) => {
-      setModal({ kind: "confirm", title, message, onConfirm: onOk });
+    (title: string, message: string, onOk: () => void, onCancel?: () => void) => {
+      setModal({ kind: "confirm", title, message, onConfirm: onOk, onCancel });
     },
     []
   );
@@ -129,6 +176,43 @@ export function App() {
   const closeModal = useCallback(() => {
     setModal(null);
   }, []);
+
+  // 弹窗键盘支持：打开时焦点移入主按钮；
+  // Enter=确定（焦点在取消上则取消）、Esc=取消、Tab 在两按钮间循环。
+  // 用捕获阶段监听，确保弹窗打开期间输入框等底层控件收不到回车，避免误触发发送。
+  useEffect(() => {
+    if (!modal) return;
+    modalOkRef.current?.focus();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+        modal.onCancel?.();
+      } else if (e.key === "Enter") {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.activeElement === modalCancelRef.current) {
+          closeModal();
+          modal.onCancel?.();
+        } else {
+          closeModal();
+          modal.onConfirm?.();
+        }
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        e.stopPropagation();
+        const active = document.activeElement;
+        if (active === modalOkRef.current && modalCancelRef.current) {
+          modalCancelRef.current.focus();
+        } else {
+          modalOkRef.current?.focus();
+        }
+      }
+    };
+    document.addEventListener("keydown", onKey, true);
+    return () => document.removeEventListener("keydown", onKey, true);
+  }, [modal, closeModal]);
 
   /**
    * 侧边栏切换功能页。
@@ -160,6 +244,13 @@ export function App() {
     <div
       className={
         page === "chat" ? "container app-shell container-wide" : "container app-shell"
+      }
+      // AI 对话页激活时容器高度=窗口视口，flex 链才有确定基准：
+      // 消息区在内部滚动、输入框贴底；overflow 隐藏防止任何意外溢出产生页面滚动
+      style={
+        page === "chat"
+          ? { height: "100vh", overflow: "hidden" }
+          : undefined
       }
       ref={containerRef}
     >
@@ -262,16 +353,25 @@ export function App() {
                 onOpenAdd={() => setShowTimerAdd(true)}
               />
             )}
-            {page === "chat" && (
-              <ChatPage
-                onToast={showToast}
-                onError={showError}
-                onConfirm={showConfirm}
-              />
-            )}
             {page === "about" && <AboutPage />}
           </>
         )}
+        {/*
+          AI 对话页保持常驻（切走时仅隐藏、不卸载）：
+          流式输出期间切到其他页面，返回后能继续看到增量输出，
+          而不是重新加载出已保存的完整回复。display:none 不占布局，
+          窗口高度自适应只按当前可见页面测量。
+        */}
+        <div
+          className="chat-keepalive"
+          style={{ display: page === "chat" ? undefined : "none" }}
+        >
+          <ChatPage
+            onToast={showToast}
+            onError={showError}
+            onConfirm={showConfirm}
+          />
+        </div>
       </div>
 
       {modal && (
@@ -287,12 +387,17 @@ export function App() {
               {modal.kind === "confirm" ? (
                 <>
                   <button
+                    ref={modalCancelRef}
                     className="modal-btn modal-btn-secondary"
-                    onClick={closeModal}
+                    onClick={() => {
+                      closeModal();
+                      modal.onCancel?.();
+                    }}
                   >
                     取消
                   </button>
                   <button
+                    ref={modalOkRef}
                     className="modal-btn modal-btn-primary"
                     onClick={() => {
                       closeModal();
@@ -304,6 +409,7 @@ export function App() {
                 </>
               ) : (
                 <button
+                  ref={modalOkRef}
                   className="modal-btn modal-btn-primary"
                   onClick={closeModal}
                 >
